@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading Progress Bar with Controls</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #ffd54f;
+            font-family: Arial, sans-serif;
+            transition: background-color 0.5s ease;
+        }
+
+        .loading-container {
+            text-align: center;
+        }
+
+        .loading-text {
+            color: #ffab00;
+            font-size: 24px;
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            width: 300px;
+            height: 40px;
+            background-color: #ffe082;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .progress {
+            width: 0;
+            height: 100%;
+            background-color: #ffab00;
+            border-radius: 20px;
+            transition: width 0.5s ease-in-out;
+        }
+
+        .fan {
+            position: absolute;
+            top: 50%;
+            right: 5px;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+        }
+
+        .fan-blade {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: #ff8f00;
+            border-radius: 0 50% 50% 50%;
+            top: 7.5px;
+            left: 7.5px;
+            transform-origin: 50% 50%;
+        }
+
+        .leaf {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #4caf50;
+            border-radius: 50% 0 50% 50%;
+            transform: rotate(45deg);
+        }
+
+        .button {
+            background-color: #ffab00;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .play-button {
+            background-color: #4CAF50;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px auto;
+            cursor: pointer;
+        }
+
+        .play-button::before {
+            content: '';
+            width: 0;
+            height: 0;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-left: 15px solid white;
+            margin-left: 5px;
+        }
+
+        .play-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .message.success {
+            background-color: #4CAF50;
+        }
+
+        .message.error {
+            background-color: #f44336;
+        }
+
+        .message.show {
+            opacity: 1;
+        }
+
+
+
+    </style>
+</head>
+<body>
+<div class="loading-container">
+    <button id="testButton" class="button">Test Connection</button>
+    <div>
+        <button id="downloadButton" class="button" style="display: none">Download</button>
+    </div>
+    <div>
+        <span id="tipsText"></span>
+    </div>
+
+    <div id="loading" class="loading">
+        <div id="loadingText" class="loading-text">loading...</div>
+        <div class="progress-bar">
+            <div class="progress"></div>
+            <div class="fan">
+                <div class="fan-blade"></div>
+                <div class="fan-blade"></div>
+                <div class="fan-blade"></div>
+                <div class="fan-blade"></div>
+            </div>
+        </div>
+        <div class="play-button" id="startButton"></div>
+    </div>
+</div>
+<div id="message" class="message"></div>
+
+<script>
+    const progressBar = document.querySelector('.progress-bar');
+    const progress = document.querySelector('.progress');
+    const fan = document.querySelector('.fan');
+    const testButton = document.getElementById('testButton');
+    const downloadButton = document.getElementById('downloadButton');
+    const tipsText = document.getElementById('tipsText');
+    const startButton = document.getElementById('startButton');
+    const loading = document.getElementById('loading');
+    const loadingText = document.getElementById('loadingText');
+    const messageElement = document.getElementById('message');
+    let width = 0;
+    let animationId;
+    let uuid = generateUUID();
+    let leafInterval;
+
+    function initFanBlades() {
+        const blades = document.querySelectorAll('.fan-blade');
+        blades.forEach((blade, index) => {
+            blade.style.transform = `rotate(${index * 90}deg)`;
+        });
+    }
+
+    function animateFan() {
+        fan.style.animation = 'spin 0.8s linear infinite';
+    }
+
+    function stopFan() {
+        fan.style.animation = 'none';
+        fan.style.display = 'none';
+    }
+
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    function createLeaf() {
+        const leaf = document.createElement('div');
+        leaf.className = 'leaf';
+        leaf.style.right = '40px';
+        leaf.style.top = Math.random() * 30 + 5 + 'px';
+        progressBar.appendChild(leaf);
+
+        let position = 40;
+        const moveLeaf = () => {
+            if (position <= width * 3) {
+                position += 1 + (width / 50);
+                leaf.style.right = position + 'px';
+                requestAnimationFrame(moveLeaf);
+            } else {
+                leaf.remove();
+            }
+        };
+        moveLeaf();
+    }
+
+    function startLeafAnimation() {
+        clearInterval(leafInterval);
+        leafInterval = setInterval(() => {
+            if (Math.random() < 0.1 + (width / 200)) {
+                createLeaf();
+            }
+        }, 100);
+    }
+
+    function stopLeafAnimation() {
+        clearInterval(leafInterval);
+    }
+
+    async function testConnection() {
+        try {
+            const response = await fetch('/api/request/testConnection');
+            const res = await response.json()
+            if (!response.ok) {
+                showMessage(res.msg, 'error')
+                throw new Error('Network response was not ok');
+            }
+            showMessage(res.msg, 'success')
+            return res;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    function startTask(uuid) {
+        try {
+            return new Promise(() => {
+                fetch('/api/request/startSync/' + uuid);
+            });
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    async function getProgress(uuid) {
+        try {
+            const response = await fetch('/api/request/getProgress/' + uuid);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return await response.json();
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    testButton.addEventListener('click', async () => {
+        try {
+            await testConnection();
+            document.body.style.backgroundColor = '#90EE90';
+            loading.style.display = 'block'
+        } catch {
+            document.body.style.backgroundColor = '#FFCCCB';
+            loading.style.display = 'none';
+        }
+    });
+
+    downloadButton.addEventListener('click', async () => {
+        let dots = 0;
+        const intervalID =setInterval(() => {
+            dots = (dots + 1) % 4;
+            tipsText.innerHTML = 'Preparing to download' + '.'.repeat(dots);
+        }, 500);
+        fetch("/compare/getDifference")
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'difference';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                clearInterval(intervalID);
+                tipsText.textContent = 'Download complete!'
+            })
+            .catch(error => {
+                console.error('Download failed:', error);
+            });
+    });
+
+    startButton.addEventListener('click', async () => {
+        uuid = generateUUID();
+        startTask(uuid);
+        testButton.style.display = 'none'
+        startButton.style.display = 'none'
+        animateFan();
+        startLeafAnimation();
+
+        const updateProgress = async () => {
+            try {
+                const data = await getProgress(uuid);
+                width = data.process;
+                if ("FAIL" === data.taskStatus) {
+                    showMessage('Error, please check the log', 'error')
+                    stopFan();
+                    stopLeafAnimation();
+                    loadingText.textContent = 'error';
+                    return;
+                }
+                progress.style.width = width + '%';
+                if (width < 100) {
+                    setTimeout(updateProgress, 500);
+                } else {
+                    loadingText.textContent = 'done';
+                    stopFan();
+                    stopLeafAnimation();
+                    downloadButton.style.display = 'inline-block';
+                    showMessage('Migration successful, please download comparison data', 'success');
+                }
+            } catch (error) {
+                console.error('Error updating progress:', error);
+            }
+        };
+        updateProgress();
+    });
+
+    initFanBlades();
+
+    function showMessage(text, type) {
+        messageElement.textContent = text;
+        messageElement.className = `message ${type}`;
+        messageElement.classList.add('show');
+
+        setTimeout(() => {
+            messageElement.classList.remove('show');
+        }, 3000);
+    }
+
+</script>
+</body>
+</html>
